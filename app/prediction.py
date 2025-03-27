@@ -20,6 +20,10 @@ class RentalPricePredictor:
             
             # Load preprocessor with additional error handling
             try:
+                # Print current working directory for debugging
+                print(f"Current working directory: {os.getcwd()}")
+                print(f"Checking if preprocessor path exists: {os.path.exists(preprocessor_path)}")
+                
                 with open(preprocessor_path, 'rb') as f:
                     self.preprocessor = pickle.load(f)
                     print(f"Preprocessor loaded successfully. Type: {type(self.preprocessor)}")
@@ -33,16 +37,29 @@ class RentalPricePredictor:
                         print(f"Preprocessor reloaded successfully. Type: {type(self.preprocessor)}")
             except Exception as e:
                 print(f"Error loading preprocessor: {str(e)}")
-                # If we're on Streamlit Cloud, try a relative path
-                try:
-                    alt_path = os.path.join('models', 'preprocessor.pkl')
-                    print(f"Trying alternative path: {alt_path}")
-                    with open(alt_path, 'rb') as f:
-                        self.preprocessor = pickle.load(f)
-                        print(f"Preprocessor loaded from alternative path. Type: {type(self.preprocessor)}")
-                except Exception as inner_e:
-                    print(f"Failed to load preprocessor from alternative path: {str(inner_e)}")
-                    raise
+                # Try multiple alternative paths for Streamlit Cloud
+                possible_paths = [
+                    os.path.join('models', 'preprocessor.pkl'), 
+                    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models', 'preprocessor.pkl'),  
+                    os.path.abspath(os.path.join('.', 'models', 'preprocessor.pkl')),  #
+                    os.path.join(os.path.dirname(model_path), 'preprocessor.pkl')  
+                ]
+                
+                for alt_path in possible_paths:
+                    try:
+                        print(f"Trying alternative path: {alt_path}")
+                        print(f"Path exists: {os.path.exists(alt_path)}")
+                        with open(alt_path, 'rb') as f:
+                            self.preprocessor = pickle.load(f)
+                            print(f"Preprocessor loaded successfully from {alt_path}. Type: {type(self.preprocessor)}")
+                            break
+                    except Exception as inner_e:
+                        print(f"Failed to load preprocessor from {alt_path}: {str(inner_e)}")
+                
+                # If we still don't have a preprocessor, raise the original error
+                if not hasattr(self, 'preprocessor'):
+                    print("All alternative paths failed. Raising original error.")
+                    raise e
                 
             # Verify preprocessor has transform method
             if not hasattr(self.preprocessor, 'transform'):
