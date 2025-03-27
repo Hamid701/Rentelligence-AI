@@ -1,0 +1,16 @@
+# Specific files to ignore
+notebooks/data_cleaning.ipynb
+data/rent_raw.csv
+House_Prices.code-workspace
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter Notebook temporary files
+.ipynb_checkpoints/
+
+# Virtual Environment
+venv/
+ENV/
