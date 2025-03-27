@@ -1,113 +1,85 @@
 import pickle
-import pandas as pd
 import numpy as np
+import pandas as pd
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 class RentalPricePredictor:
     def __init__(self, model_path, preprocessor_path):
+        """
+        Initialize the predictor with model and preprocessor paths.
+        
+        Args:
+            model_path (str): Path to the pickled XGBoost model
+            preprocessor_path (str): Path to the pickled preprocessor
+        """
+        self.model = None
+        self.preprocessor = None
+        
+        # Load the model
         try:
-            # Validate paths
-            if not isinstance(model_path, str) or not isinstance(preprocessor_path, str):
-                raise TypeError(f"Paths must be strings. Model path type: {type(model_path)}, Preprocessor path type: {type(preprocessor_path)}")
-                
-            print(f"Loading model from: {model_path}")
-            print(f"Loading preprocessor from: {preprocessor_path}")
-            
-            # Load model
             with open(model_path, 'rb') as f:
                 self.model = pickle.load(f)
-                print(f"Model loaded successfully. Type: {type(self.model)}")
-            
-            # Load preprocessor with additional error handling
-            try:
-                # Print current working directory for debugging
-                print(f"Current working directory: {os.getcwd()}")
-                print(f"Checking if preprocessor path exists: {os.path.exists(preprocessor_path)}")
-                
-                with open(preprocessor_path, 'rb') as f:
-                    self.preprocessor = pickle.load(f)
-                    print(f"Preprocessor loaded successfully. Type: {type(self.preprocessor)}")
-                    
-                # Double check that preprocessor is not a string
-                if isinstance(self.preprocessor, str):
-                    print(f"Warning: Preprocessor loaded as string. Attempting to fix...")
-                    # Try to load the string as a path
-                    with open(self.preprocessor, 'rb') as f:
-                        self.preprocessor = pickle.load(f)
-                        print(f"Preprocessor reloaded successfully. Type: {type(self.preprocessor)}")
-            except Exception as e:
-                print(f"Error loading preprocessor: {str(e)}")
-                # Try multiple alternative paths for Streamlit Cloud
-                possible_paths = [
-                    os.path.join('models', 'preprocessor.pkl'), 
-                    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'models', 'preprocessor.pkl'),  
-                    os.path.abspath(os.path.join('.', 'models', 'preprocessor.pkl')),  #
-                    os.path.join(os.path.dirname(model_path), 'preprocessor.pkl')  
-                ]
-                
-                for alt_path in possible_paths:
-                    try:
-                        print(f"Trying alternative path: {alt_path}")
-                        print(f"Path exists: {os.path.exists(alt_path)}")
-                        with open(alt_path, 'rb') as f:
-                            self.preprocessor = pickle.load(f)
-                            print(f"Preprocessor loaded successfully from {alt_path}. Type: {type(self.preprocessor)}")
-                            break
-                    except Exception as inner_e:
-                        print(f"Failed to load preprocessor from {alt_path}: {str(inner_e)}")
-                
-                # If we still don't have a preprocessor, raise the original error
-                if not hasattr(self, 'preprocessor'):
-                    print("All alternative paths failed. Raising original error.")
-                    raise e
-                
-            # Verify preprocessor has transform method
-            if not hasattr(self.preprocessor, 'transform'):
-                raise TypeError(f"Loaded preprocessor does not have 'transform' method. Type: {type(self.preprocessor)}")
-                
+            logger.info(f"Model loaded successfully from {model_path}")
         except Exception as e:
-            print(f"Error initializing predictor: {str(e)}")
-            print(f"Model path: {model_path}")
-            print(f"Preprocessor path: {preprocessor_path}")
-            raise
+            logger.error(f"Error loading model from {model_path}: {str(e)}")
+            raise ValueError(f"Failed to load model: {str(e)}")
+        
+        # Load the preprocessor
+        try:
+            with open(preprocessor_path, 'rb') as f:
+                self.preprocessor = pickle.load(f)
+            logger.info(f"Preprocessor loaded successfully from {preprocessor_path}")
+            
+            # Verify the preprocessor is not a string
+            if isinstance(self.preprocessor, str):
+                logger.error("Preprocessor was loaded as a string instead of a transformer object")
+                raise TypeError("Preprocessor is a string, not a transformer object")
+        except Exception as e:
+            logger.error(f"Error loading preprocessor from {preprocessor_path}: {str(e)}")
+            raise ValueError(f"Failed to load preprocessor: {str(e)}")
     
     def predict(self, features):
+        """
+        Make a prediction based on input features.
+        
+        Args:
+            features (dict): Dictionary containing feature names and values
+        
+        Returns:
+            float: Predicted rental price
+        """
+        if not self.model or not self.preprocessor:
+            raise ValueError("Model or preprocessor not loaded properly")
+        
         try:
-            # Ensure features is a dictionary and not a string
-            if isinstance(features, str):
-                raise TypeError("Features must be a dictionary, not a string")
-                
-            # Create DataFrame from features
-            input_df = pd.DataFrame([features])
-            print(f"Input DataFrame columns: {input_df.columns.tolist()}")
+            # Convert features dictionary to DataFrame with a single row
+            features_df = pd.DataFrame([features])
             
-            # Ensure preprocessor is properly loaded
-            if not hasattr(self.preprocessor, 'transform'):
-                raise TypeError("Preprocessor is not properly loaded or initialized")
-                
-            # Check if preprocessor has feature_names_in_ attribute
-            if hasattr(self.preprocessor, 'feature_names_in_'):
-                print(f"Preprocessor expected columns: {self.preprocessor.feature_names_in_.tolist()}")
-                
-                # Check for missing columns
-                missing_cols = [col for col in self.preprocessor.feature_names_in_ if col not in input_df.columns]
-                if missing_cols:
-                    print(f"Warning: Missing columns in input data: {missing_cols}")
-                    
-                # Ensure columns are in the right order
-                if hasattr(self.preprocessor, 'feature_names_in_'):
-                    input_df = input_df.reindex(columns=self.preprocessor.feature_names_in_, fill_value=0)
+            # Ensure categorical features are strings
+            for col in features_df.columns:
+                if col in ['region', 'city', 'region_standardized']:
+                    features_df[col] = features_df[col].astype(str)
             
-            # Transform the input data
-            input_processed = self.preprocessor.transform(input_df)
+            # Convert boolean features to integers (0/1)
+            bool_cols = [col for col in features_df.columns if col.startswith('has_') or col.startswith('is_')]
+            for col in bool_cols:
+                if col in features_df.columns:
+                    features_df[col] = features_df[col].astype(int)
+            
+            # Apply preprocessing
+            X_processed = self.preprocessor.transform(features_df)
             
             # Make prediction
-            log_price_pred = self.model.predict(input_processed)[0]
-            price_pred = np.expm1(log_price_pred)
+            prediction = self.model.predict(X_processed)[0]
             
-            return price_pred
+            return prediction
+        
         except Exception as e:
-            # Add more detailed error information
-            error_msg = f"Prediction error: {str(e)}\nFeatures type: {type(features)}\nPreprocessor type: {type(self.preprocessor)}\nInput DataFrame columns: {input_df.columns.tolist() if 'input_df' in locals() else 'N/A'}"
-            print(error_msg)
-            raise Exception(error_msg)
+            logger.error(f"Error during prediction: {str(e)}")
+            # Re-raise with more context
+            raise RuntimeError(f"Prediction failed: {str(e)}")
