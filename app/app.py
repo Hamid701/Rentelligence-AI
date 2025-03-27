@@ -104,7 +104,7 @@ def load_confidence_metrics():
             confidence_metrics = pickle.load(f)
         return confidence_metrics
     except:
-        return {'confidence_percentage': 83.64}  # Default value based on the model's performance
+        return {'confidence_percentage': 82.3}  # Default value based on the model's performance
 
 # Load the regional data for the map
 @st.cache_data
@@ -162,7 +162,8 @@ def create_map(merged_gdf):
 # Make prediction and display results
 def make_prediction(features, predictor, confidence_metrics):
     try:
-        predicted_price = predictor.predict(features)
+        # Use predict_with_confidence to get prediction with bounds
+        predicted_price, lower_bound, upper_bound = predictor.predict_with_confidence(features)
         
         # Display prediction with bounds check
         if predicted_price < 200 or predicted_price > 10000:
@@ -171,6 +172,9 @@ def make_prediction(features, predictor, confidence_metrics):
         # Create prediction box
         st.markdown('<div class="prediction-box" style="background-color: #E3F2FD;">', unsafe_allow_html=True)
         st.markdown(f"### Estimated Monthly Rent: €{predicted_price:.2f}")
+        
+        # Display confidence bounds
+        st.markdown(f"#### Price Range: €{lower_bound:.2f} - €{upper_bound:.2f}")
         
         # Confidence percentage
         confidence_percentage = confidence_metrics.get('confidence_percentage', 83.64)

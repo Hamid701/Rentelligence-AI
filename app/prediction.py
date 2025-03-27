@@ -1,85 +1,80 @@
+import os
 import pickle
 import numpy as np
 import pandas as pd
-import os
-import logging
-
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
 class RentalPricePredictor:
-    def __init__(self, model_path, preprocessor_path):
-        """
-        Initialize the predictor with model and preprocessor paths.
-        
-        Args:
-            model_path (str): Path to the pickled XGBoost model
-            preprocessor_path (str): Path to the pickled preprocessor
-        """
-        self.model = None
-        self.preprocessor = None
-        
-        # Load the model
-        try:
-            with open(model_path, 'rb') as f:
-                self.model = pickle.load(f)
-            logger.info(f"Model loaded successfully from {model_path}")
-        except Exception as e:
-            logger.error(f"Error loading model from {model_path}: {str(e)}")
-            raise ValueError(f"Failed to load model: {str(e)}")
-        
-        # Load the preprocessor
-        try:
-            with open(preprocessor_path, 'rb') as f:
-                self.preprocessor = pickle.load(f)
-            logger.info(f"Preprocessor loaded successfully from {preprocessor_path}")
-            
-            # Verify the preprocessor is not a string
-            if isinstance(self.preprocessor, str):
-                logger.error("Preprocessor was loaded as a string instead of a transformer object")
-                raise TypeError("Preprocessor is a string, not a transformer object")
-        except Exception as e:
-            logger.error(f"Error loading preprocessor from {preprocessor_path}: {str(e)}")
-            raise ValueError(f"Failed to load preprocessor: {str(e)}")
+    """
+    A class to handle rental price predictions using a trained XGBoost model.
+    This class loads the model and preprocessor, and provides methods for making predictions.
+    """
     
-    def predict(self, features):
-        """
-        Make a prediction based on input features.
+    def __init__(self, model_path, preprocessor_path):
         
-        Args:
-            features (dict): Dictionary containing feature names and values
-        
-        Returns:
-            float: Predicted rental price
-        """
-        if not self.model or not self.preprocessor:
-            raise ValueError("Model or preprocessor not loaded properly")
+        self.model_path = model_path
+        self.preprocessor_path = preprocessor_path
+        self._load_model()
+        self._load_preprocessor()
+    
+    def _load_model(self):
         
         try:
-            # Convert features dictionary to DataFrame with a single row
+            with open(self.model_path, 'rb') as f:
+                self.model = pickle.load(f)
+        except Exception as e:
+            raise Exception(f"Failed to load model from {self.model_path}: {str(e)}")
+    
+    def _load_preprocessor(self):
+        
+        try:
+            with open(self.preprocessor_path, 'rb') as f:
+                self.preprocessor = pickle.load(f)
+        except Exception as e:
+            raise Exception(f"Failed to load preprocessor from {self.preprocessor_path}: {str(e)}")
+    
+    def preprocess_features(self, features):
+        
+        try:
+            # Convert the features dictionary to a DataFrame
             features_df = pd.DataFrame([features])
             
-            # Ensure categorical features are strings
-            for col in features_df.columns:
-                if col in ['region', 'city', 'region_standardized']:
-                    features_df[col] = features_df[col].astype(str)
-            
-            # Convert boolean features to integers (0/1)
-            bool_cols = [col for col in features_df.columns if col.startswith('has_') or col.startswith('is_')]
-            for col in bool_cols:
-                if col in features_df.columns:
-                    features_df[col] = features_df[col].astype(int)
-            
-            # Apply preprocessing
+            # Apply the preprocessor
             X_processed = self.preprocessor.transform(features_df)
             
-            # Make prediction
-            prediction = self.model.predict(X_processed)[0]
+            return X_processed
+        except Exception as e:
+            raise Exception(f"Error during feature preprocessing: {str(e)}")
+    
+    def predict(self, features):
+
+        try:
+            # Preprocess the features
+            X_processed = self.preprocess_features(features)
+            
+            # Make prediction (this returns log-transformed price)
+            log_prediction = self.model.predict(X_processed)[0]
+            
+            # Apply inverse log transformation to get actual price
+            prediction = np.expm1(log_prediction)
+            
+            # Ensure prediction is within reasonable bounds
+            prediction = max(200, min(10000, prediction))
             
             return prediction
-        
         except Exception as e:
-            logger.error(f"Error during prediction: {str(e)}")
-            # Re-raise with more context
-            raise RuntimeError(f"Prediction failed: {str(e)}")
+            raise Exception(f"Error making prediction: {str(e)}")
+    
+    def predict_with_confidence(self, features):
+
+        try:
+            # Get the base prediction
+            prediction = self.predict(features)
+            
+            # Apply a simple confidence interval (±15%)
+            # In a production system, this would be more sophisticated
+            lower_bound = prediction * 0.85
+            upper_bound = prediction * 1.15
+            
+            return prediction, lower_bound, upper_bound
+        except Exception as e:
+            raise Exception(f"Error calculating prediction with confidence: {str(e)}")
