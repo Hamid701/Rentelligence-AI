@@ -62,7 +62,6 @@ class RentalPricePredictor:
                 luxury_score += 1
         
         features_df['luxury_score'] = luxury_score
-        logger.info(f"Calculated luxury_score: {luxury_score}")
         
         # Keep only the features used in training
         required_features = self.numeric_features + self.binary_features + self.categorical_features
@@ -70,7 +69,6 @@ class RentalPricePredictor:
         # Ensure all required features are present
         for feature in required_features:
             if feature not in features_df.columns:
-                logger.warning(f"Missing feature: {feature}, setting to default value")
                 if feature in self.numeric_features:
                     features_df[feature] = 0
                 elif feature in self.binary_features:
@@ -92,47 +90,13 @@ class RentalPricePredictor:
             features_df = self.preprocess_features(features)
             
             # Apply the column transformer
-            try:
-                X_processed = self.preprocessor.transform(features_df)
-            except AttributeError as attr_error:
-                # Handle the specific 'feature_name_combiner' error
-                if "feature_name_combiner" in str(attr_error):
-                    logger.warning("Detected scikit-learn version mismatch. Attempting workaround...")
-                    
-                    # Try to manually transform each component
-                    transformed_parts = []
-                    
-                    for name, transformer, columns in self.preprocessor.transformers_:
-                        if name == 'drop' or transformer == 'drop':
-                            continue
-                        
-                        if transformer == 'passthrough':
-                            # For passthrough, just use the columns as is
-                            transformed_parts.append(features_df[columns].values)
-                        else:
-                            # For actual transformers, apply transform
-                            try:
-                                transformed = transformer.transform(features_df[columns])
-                                transformed_parts.append(transformed)
-                            except Exception as e:
-                                logger.error(f"Error transforming {name}: {str(e)}")
-                                raise
-                    
-                    # Combine the transformed parts
-                    X_processed = np.hstack(transformed_parts)
-                    logger.info("Manual transform workaround successful")
-                else:
-                    # If it's a different attribute error, re-raise
-                    raise
+            X_processed = self.preprocessor.transform(features_df)
             
             # Make prediction (model was trained on log_price)
             log_prediction = self.model.predict(X_processed)[0]
             
             # Convert from log scale back to original scale
-            prediction = np.exp(log_prediction)
-            
-            logger.info(f"Final prediction: {prediction}")
-            return prediction
+            return np.exp(log_prediction)
             
         except Exception as e:
             logger.error(f"Error during prediction: {str(e)}")
