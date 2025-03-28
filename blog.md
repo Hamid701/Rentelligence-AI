@@ -322,17 +322,20 @@ The app's interactive map allows users to:
 ### Smart Price Prediction
 
 The heart of Rentelligence AI is its prediction engine, which uses our trained XGBoost model to:
-- Generate personalized rental estimates based on 20+ property features.
+- Generate personalized rental estimates based on 15+ property features.
 - Provide confidence intervals to understand the potential price range.
+
+Test set performance Metrics on original price scale (€):
+- **MAE: €303.62** (Mean Absolute Error)
+- **RMSE: €606.04** (Root Mean Squared Error)
+- **R²: 0.7406** (Coefficient of Determination)
+
+The model achieves 82.32% prediction accuracy on test data, making it reliable enough for real-world use while acknowledging the inherent unpredictability of real estate markets.
 
 ### Try It Yourself
 
 Experience Rentelligence AI firsthand and discover fair rental prices across Italy:
 [Rentelligence AI App](https://rentelligence-ai.streamlit.app)
-
-Whether you're planning a move to Milan, researching rental options in Rome, or just curious about the Italian property market, Rentelligence AI provides the data-driven insights you need to make informed decisions.
-
-The model achieves 82.32% prediction accuracy on test data, making it reliable enough for real-world use while acknowledging the inherent unpredictability of real estate markets.
 
 ### Future Directions
 
