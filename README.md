@@ -1,14 +1,15 @@
 # 🏠 Rentelligence AI: Predicting Italian Rental Prices
 
-<div style="display: flex; align-items: center; gap: 20px;">
-  <div style="flex: 2;">
-    A machine learning application that predicts rental prices for properties across Italy based on location, property size, amenities, and other key features. Rentelligence AI helps users make informed decisions when navigating the Italian rental market. Rentelligence AI was born from a personal need to understand fair rental prices when moving to Italy. What started as a personal quest evolved into a comprehensive analysis of the Italian rental market, revealing fascinating patterns about how location, timing, and property features influence rental prices across the country.
-
-  </div>
-  <div style="flex: 1;">
-    <img src="./images/header.jpg" alt="Italian Rental Market" width="70%" style="border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
-  </div>
-</div>
+<table>
+  <tr>
+    <td style="vertical-align: top; width: 60%;">
+      A machine learning application that predicts rental prices for properties across Italy based on location, property size, amenities, and other key features. Rentelligence AI helps users make informed decisions when navigating the Italian rental market. Rentelligence AI was born from a personal need to understand fair rental prices when moving to Italy. What started as a personal quest evolved into a comprehensive analysis of the Italian rental market, revealing fascinating patterns about how location, timing, and property features influence rental prices across the country.
+    </td>
+    <td style="vertical-align: top; width: 40%; text-align: center;">
+      <img src="./images/header.jpg" alt="Italian Rental Market" width="400px" style="border-radius: 10px; max-width: 100%;">
+    </td>
+  </tr>
+</table>
 
 ## 📚 Project Blog
 
