@@ -112,7 +112,13 @@ def load_map_data():
     regions_gdf = gpd.read_file(os.path.join(project_root, 'data', 'limits_IT_regions.geojson'))
     rental_data = pd.read_csv(os.path.join(project_root, 'data', 'italian_rental_processed.csv'))
     
+    # Standardize region names during loading to avoid repeated operations
     rental_data['region_standardized'] = rental_data['region'].map(region_mapping)
+    
+    # Pre-compute region-city mapping for faster filtering
+    region_city_map = {}
+    for region in rental_data['region_standardized'].unique():
+        region_city_map[region] = sorted(rental_data[rental_data['region_standardized'] == region]['city'].dropna().unique())
     
     region_stats = rental_data.groupby('region_standardized')['price'].agg(['mean', 'median', 'count']).reset_index()
     region_stats.columns = ['reg_name', 'mean_price', 'median_price', 'property_count']
@@ -123,7 +129,7 @@ def load_map_data():
         right_on='reg_name'
     )
     
-    return merged_gdf, rental_data
+    return merged_gdf, rental_data, region_city_map
 
 # Create the interactive map
 def create_map(merged_gdf):
@@ -213,12 +219,12 @@ def main():
 
     # Load map data once for both columns
     try:
-        merged_gdf, rental_data = load_map_data()
+        merged_gdf, rental_data, region_city_map = load_map_data()
         data_loaded = True
     except Exception as e:
         st.error(f"Error loading data: {e}")
         data_loaded = False
-        merged_gdf, rental_data = None, None
+        merged_gdf, rental_data, region_city_map = None, None, {}
 
     # Map column
     with col1:
@@ -244,10 +250,26 @@ def main():
         # Get unique regions and cities from the data for the dropdown
         if data_loaded:
             regions = sorted(rental_data['region_standardized'].dropna().unique())
-            cities = sorted(rental_data['city'].dropna().unique())
+            all_cities = sorted(rental_data['city'].dropna().unique())
         else:
             regions = ["Lombardia", "Lazio", "Toscana", "Veneto", "Piemonte", "Emilia-Romagna", "Campania", "Sicilia"]
-            cities = ["Milano", "Roma", "Firenze", "Venezia", "Torino", "Bologna", "Napoli", "Palermo"]
+            all_cities = ["Milano", "Roma", "Firenze", "Venezia", "Torino", "Bologna", "Napoli", "Palermo"]
+        
+        # Location selection outside the form for dynamic filtering
+        st.markdown("#### Location")
+        region = st.selectbox("Region", regions, key="region_selector")
+        
+        # Filter cities based on selected region
+        if data_loaded:
+            filtered_cities = region_city_map.get(region, [])
+            # If no cities found for the region, provide a default list
+            if len(filtered_cities) == 0:
+                filtered_cities = ["Unknown City"]
+        else:
+            # Default cities if data not loaded
+            filtered_cities = ["Milano", "Roma", "Firenze", "Venezia", "Torino", "Bologna", "Napoli", "Palermo"]
+            
+        city = st.selectbox("City", filtered_cities, key="city_selector")
         
         # Create input form
         with st.form("prediction_form"):
@@ -255,15 +277,10 @@ def main():
             st.markdown("#### Basic Information")
             
             area = st.number_input("Area (m²)", min_value=15, max_value=1000, value=80)
-            log_area = np.log1p(area)  # Calculate log_area
+            log_area = np.log1p(area)
             
             num_bedrooms = st.number_input("Number of Bedrooms", min_value=0, max_value=10, value=2)
             bathrooms = st.number_input("Number of Bathrooms", min_value=1, max_value=10, value=1)
-            
-            # Location
-            st.markdown("#### Location")
-            region = st.selectbox("Region", regions)
-            city = st.selectbox("City", cities)
             
             # Building details
             st.markdown("#### Building Details")
@@ -283,39 +300,47 @@ def main():
                 has_elevator = st.checkbox("Elevator")
                 has_doorman = st.checkbox("Doorman")
                 has_balcony = st.checkbox("Balcony")
+                has_terrace = st.checkbox("Terrace")
+                has_garden = st.checkbox("Garden")
             with col_b:
                 has_external_exposure = st.checkbox("External Exposure")
                 has_furnished = st.checkbox("Furnished")
-            
-            # Luxury score calculation
-            luxury_features = [has_elevator, has_doorman, has_balcony, has_external_exposure, has_furnished]
-            luxury_score = sum(luxury_features) / len(luxury_features)
+                has_air_conditioning = st.checkbox("Air Conditioning")
+                has_storage_room = st.checkbox("Storage Room")
+                has_cellar = st.checkbox("Cellar")
             
             # Submit button
             submitted = st.form_submit_button("Predict Rental Price")
         
         # Make prediction when form is submitted
         if submitted and model_loaded:
-            # Prepare features dictionary with all required features
-            features = {
-                'log_area': log_area,
-                'bathrooms': bathrooms,
-                'num_bedrooms': num_bedrooms,
-                'floor_to_height_ratio': floor_to_height_ratio,
-                'total_floors': total_floors,
-                'parking_spaces': parking_spaces,
-                'has_elevator': int(has_elevator),
-                'has_doorman': int(has_doorman),
-                'has_balcony': int(has_balcony),
-                'has_external_exposure': int(has_external_exposure),
-                'has_furnished': int(has_furnished),
-                'region_standardized': region,
-                'city': city,
-                'luxury_score': luxury_score
-            }
-            
-            # Get prediction
-            make_prediction(features, predictor, confidence_metrics)
+            with st.spinner("Calculating your rental price estimate..."):
+                features = {
+                    'area': area,
+                    'log_area': log_area,
+                    'bathrooms': bathrooms,
+                    'num_bedrooms': num_bedrooms,
+                    'floor': current_floor,
+                    'total_floors': total_floors,
+                    'floor_to_height_ratio': floor_to_height_ratio,
+                    'parking_spaces': parking_spaces,
+                    'has_elevator': int(has_elevator),
+                    'has_doorman': int(has_doorman),
+                    'has_balcony': int(has_balcony),
+                    'has_external_exposure': int(has_external_exposure),
+                    'has_furnished': int(has_furnished),
+                    'has_terrace': int(has_terrace),
+                    'has_garden': int(has_garden),
+                    'has_air_conditioning': int(has_air_conditioning),
+                    'has_storage_room': int(has_storage_room),
+                    'has_cellar': int(has_cellar),
+                    'region': region,
+                    'region_standardized': region,
+                    'city': city
+                }
+                
+                # Get prediction
+                make_prediction(features, predictor, confidence_metrics)
 
     # Add model information section
     with st.expander("About this Model"):
