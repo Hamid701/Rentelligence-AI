@@ -22,26 +22,9 @@ class RentalPricePredictor:
             raise ValueError(f"Failed to load model: {str(e)}")
             
         try:
-            # Log the preprocessor path for debugging
-            logger.info(f"Attempting to load preprocessor from: {preprocessor_path}")
-            
-            # Check if file exists
-            if not os.path.exists(preprocessor_path):
-                logger.error(f"Preprocessor file not found: {preprocessor_path}")
-                raise FileNotFoundError(f"Preprocessor file not found: {preprocessor_path}")
-                
-            # Log file size
-            file_size = os.path.getsize(preprocessor_path)
-            logger.info(f"Preprocessor file size: {file_size} bytes")
-            
+            # Load preprocessor
             with open(preprocessor_path, 'rb') as preprocessor_file:
                 self.preprocessor = pickle.load(preprocessor_file)
-                
-            # Verify the preprocessor type
-            if not hasattr(self.preprocessor, 'transform'):
-                logger.error(f"Loaded object is not a valid preprocessor: {type(self.preprocessor)}")
-                raise TypeError(f"Loaded object is not a valid preprocessor: {type(self.preprocessor)}")
-                
             logger.info(f"Preprocessor loaded successfully from {preprocessor_path}")
             
         except Exception as e:
@@ -98,7 +81,6 @@ class RentalPricePredictor:
         # Select only the required features in the correct order
         features_df = features_df[required_features]
         
-        logger.info(f"Preprocessed features: {features_df.to_dict(orient='records')[0]}")
         return features_df
 
     def predict(self, features):
@@ -109,32 +91,9 @@ class RentalPricePredictor:
             # Preprocess features
             features_df = self.preprocess_features(features)
             
-            # Debug the preprocessor type
-            logger.info(f"Preprocessor type: {type(self.preprocessor)}")
-            
-            # Check if preprocessor is valid
-            if isinstance(self.preprocessor, str):
-                logger.error(f"Preprocessor is a string: '{self.preprocessor}'")
-                raise ValueError(f"Preprocessor is a string, not a transformer object")
-            
-            if not hasattr(self.preprocessor, 'transform'):
-                logger.error(f"Invalid preprocessor: {self.preprocessor}")
-                raise ValueError(f"Preprocessor doesn't have transform method. Type: {type(self.preprocessor)}")
-            
-            # Debug the transformers in the column transformer
-            if hasattr(self.preprocessor, 'transformers_'):
-                logger.info(f"Transformers: {self.preprocessor.transformers_}")
-                
-                # Check each transformer
-                for name, transformer, columns in self.preprocessor.transformers_:
-                    logger.info(f"Transformer '{name}' type: {type(transformer)}")
-                    if isinstance(transformer, str):
-                        logger.error(f"Transformer '{name}' is a string: '{transformer}'")
-            
             # Apply the column transformer
             try:
                 X_processed = self.preprocessor.transform(features_df)
-                logger.info("Transform step completed successfully")
             except AttributeError as attr_error:
                 # Handle the specific 'feature_name_combiner' error
                 if "feature_name_combiner" in str(attr_error):
@@ -164,13 +123,7 @@ class RentalPricePredictor:
                     logger.info("Manual transform workaround successful")
                 else:
                     # If it's a different attribute error, re-raise
-                    logger.error(f"Attribute error during transform: {str(attr_error)}")
                     raise
-            except Exception as transform_error:
-                logger.error(f"Error during transform step: {str(transform_error)}")
-                logger.error(f"Features dataframe shape: {features_df.shape}")
-                logger.error(f"Features dataframe columns: {features_df.columns.tolist()}")
-                raise
             
             # Make prediction (model was trained on log_price)
             log_prediction = self.model.predict(X_processed)[0]
@@ -183,8 +136,6 @@ class RentalPricePredictor:
             
         except Exception as e:
             logger.error(f"Error during prediction: {str(e)}")
-            logger.error(f"Features: {features}")
-            logger.error(f"Preprocessor type: {type(self.preprocessor)}")
             raise RuntimeError(f"Prediction failed: {str(e)}")
             
     def predict_with_confidence(self, features):
