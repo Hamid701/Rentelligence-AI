@@ -188,8 +188,7 @@ def make_prediction(features, predictor, confidence_metrics):
         st.markdown('</div>', unsafe_allow_html=True)
             
     except Exception as e:
-        st.error(f"Error making prediction: {e}")
-        st.error(f"Details: {str(e)}")
+        st.error(f"Error making prediction: {str(e)}")
         
         # Add more specific error handling for common issues
         if "'str' object has no attribute 'transform'" in str(e):

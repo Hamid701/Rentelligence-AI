@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import logging
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging with less verbose output for production
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class RentalPricePredictor:
@@ -16,17 +16,13 @@ class RentalPricePredictor:
         try:
             with open(model_path, 'rb') as model_file:
                 self.model = pickle.load(model_file)
-            logger.info(f"Model loaded successfully from {model_path}")
         except Exception as e:
             logger.error(f"Error loading model: {str(e)}")
             raise ValueError(f"Failed to load model: {str(e)}")
             
         try:
-            # Load preprocessor
             with open(preprocessor_path, 'rb') as preprocessor_file:
                 self.preprocessor = pickle.load(preprocessor_file)
-            logger.info(f"Preprocessor loaded successfully from {preprocessor_path}")
-            
         except Exception as e:
             logger.error(f"Error loading preprocessor: {str(e)}")
             raise ValueError(f"Failed to load preprocessor: {str(e)}")
