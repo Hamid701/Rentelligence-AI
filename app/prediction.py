@@ -135,6 +135,37 @@ class RentalPricePredictor:
             try:
                 X_processed = self.preprocessor.transform(features_df)
                 logger.info("Transform step completed successfully")
+            except AttributeError as attr_error:
+                # Handle the specific 'feature_name_combiner' error
+                if "feature_name_combiner" in str(attr_error):
+                    logger.warning("Detected scikit-learn version mismatch. Attempting workaround...")
+                    
+                    # Try to manually transform each component
+                    transformed_parts = []
+                    
+                    for name, transformer, columns in self.preprocessor.transformers_:
+                        if name == 'drop' or transformer == 'drop':
+                            continue
+                        
+                        if transformer == 'passthrough':
+                            # For passthrough, just use the columns as is
+                            transformed_parts.append(features_df[columns].values)
+                        else:
+                            # For actual transformers, apply transform
+                            try:
+                                transformed = transformer.transform(features_df[columns])
+                                transformed_parts.append(transformed)
+                            except Exception as e:
+                                logger.error(f"Error transforming {name}: {str(e)}")
+                                raise
+                    
+                    # Combine the transformed parts
+                    X_processed = np.hstack(transformed_parts)
+                    logger.info("Manual transform workaround successful")
+                else:
+                    # If it's a different attribute error, re-raise
+                    logger.error(f"Attribute error during transform: {str(attr_error)}")
+                    raise
             except Exception as transform_error:
                 logger.error(f"Error during transform step: {str(transform_error)}")
                 logger.error(f"Features dataframe shape: {features_df.shape}")
