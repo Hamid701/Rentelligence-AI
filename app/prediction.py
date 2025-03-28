@@ -22,9 +22,28 @@ class RentalPricePredictor:
             raise ValueError(f"Failed to load model: {str(e)}")
             
         try:
+            # Log the preprocessor path for debugging
+            logger.info(f"Attempting to load preprocessor from: {preprocessor_path}")
+            
+            # Check if file exists
+            if not os.path.exists(preprocessor_path):
+                logger.error(f"Preprocessor file not found: {preprocessor_path}")
+                raise FileNotFoundError(f"Preprocessor file not found: {preprocessor_path}")
+                
+            # Log file size
+            file_size = os.path.getsize(preprocessor_path)
+            logger.info(f"Preprocessor file size: {file_size} bytes")
+            
             with open(preprocessor_path, 'rb') as preprocessor_file:
                 self.preprocessor = pickle.load(preprocessor_file)
+                
+            # Verify the preprocessor type
+            if not hasattr(self.preprocessor, 'transform'):
+                logger.error(f"Loaded object is not a valid preprocessor: {type(self.preprocessor)}")
+                raise TypeError(f"Loaded object is not a valid preprocessor: {type(self.preprocessor)}")
+                
             logger.info(f"Preprocessor loaded successfully from {preprocessor_path}")
+            
         except Exception as e:
             logger.error(f"Error loading preprocessor: {str(e)}")
             raise ValueError(f"Failed to load preprocessor: {str(e)}")
@@ -90,6 +109,18 @@ class RentalPricePredictor:
             # Preprocess features
             features_df = self.preprocess_features(features)
             
+            # Debug the preprocessor type
+            logger.info(f"Preprocessor type: {type(self.preprocessor)}")
+            
+            # Check if preprocessor is valid
+            if isinstance(self.preprocessor, str):
+                logger.error(f"Preprocessor is a string: '{self.preprocessor}'")
+                raise ValueError(f"Preprocessor is a string, not a transformer object")
+            
+            if not hasattr(self.preprocessor, 'transform'):
+                logger.error(f"Invalid preprocessor: {self.preprocessor}")
+                raise ValueError(f"Preprocessor doesn't have transform method. Type: {type(self.preprocessor)}")
+            
             # Apply the column transformer
             X_processed = self.preprocessor.transform(features_df)
             
@@ -104,6 +135,10 @@ class RentalPricePredictor:
             
         except Exception as e:
             logger.error(f"Error during prediction: {str(e)}")
+            logger.error(f"Features: {features}")
+            logger.error(f"Preprocessor type: {type(self.preprocessor)}")
+            if isinstance(self.preprocessor, str):
+                logger.error(f"Preprocessor string value: '{self.preprocessor}'")
             raise RuntimeError(f"Prediction failed: {str(e)}")
             
     def predict_with_confidence(self, features):
