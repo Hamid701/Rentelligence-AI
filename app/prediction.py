@@ -121,8 +121,25 @@ class RentalPricePredictor:
                 logger.error(f"Invalid preprocessor: {self.preprocessor}")
                 raise ValueError(f"Preprocessor doesn't have transform method. Type: {type(self.preprocessor)}")
             
+            # Debug the transformers in the column transformer
+            if hasattr(self.preprocessor, 'transformers_'):
+                logger.info(f"Transformers: {self.preprocessor.transformers_}")
+                
+                # Check each transformer
+                for name, transformer, columns in self.preprocessor.transformers_:
+                    logger.info(f"Transformer '{name}' type: {type(transformer)}")
+                    if isinstance(transformer, str):
+                        logger.error(f"Transformer '{name}' is a string: '{transformer}'")
+            
             # Apply the column transformer
-            X_processed = self.preprocessor.transform(features_df)
+            try:
+                X_processed = self.preprocessor.transform(features_df)
+                logger.info("Transform step completed successfully")
+            except Exception as transform_error:
+                logger.error(f"Error during transform step: {str(transform_error)}")
+                logger.error(f"Features dataframe shape: {features_df.shape}")
+                logger.error(f"Features dataframe columns: {features_df.columns.tolist()}")
+                raise
             
             # Make prediction (model was trained on log_price)
             log_prediction = self.model.predict(X_processed)[0]
@@ -137,8 +154,6 @@ class RentalPricePredictor:
             logger.error(f"Error during prediction: {str(e)}")
             logger.error(f"Features: {features}")
             logger.error(f"Preprocessor type: {type(self.preprocessor)}")
-            if isinstance(self.preprocessor, str):
-                logger.error(f"Preprocessor string value: '{self.preprocessor}'")
             raise RuntimeError(f"Prediction failed: {str(e)}")
             
     def predict_with_confidence(self, features):

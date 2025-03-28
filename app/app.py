@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import folium
-from streamlit_folium import folium_static
+from streamlit_folium import folium_static, st_folium
 import geopandas as gpd
 import os
 import sys
@@ -183,13 +183,18 @@ def make_prediction(features, predictor, confidence_metrics):
         st.markdown(f"#### Price Range: €{lower_bound:.2f} - €{upper_bound:.2f}")
         
         # Confidence percentage
-        confidence_percentage = confidence_metrics.get('confidence_percentage', 83.64)
+        confidence_percentage = confidence_metrics.get('confidence_percentage', 82.32)
         st.markdown(f"#### Prediction Confidence: {confidence_percentage:.1f}%")
         st.markdown('</div>', unsafe_allow_html=True)
             
     except Exception as e:
         st.error(f"Error making prediction: {e}")
         st.error(f"Details: {str(e)}")
+        
+        # Add more specific error handling for common issues
+        if "'str' object has no attribute 'transform'" in str(e):
+            st.error("There seems to be an issue with the model preprocessor.")
+            st.info("This might be due to a compatibility issue with the deployed environment. Try reloading the page or contact support.")
 
 # Main app 
 def main():
@@ -233,7 +238,7 @@ def main():
         if data_loaded:
             try:
                 m = create_map(merged_gdf)
-                folium_static(m)
+                st_folium(m, width=700)
                 
                 # Map instructions
                 st.info("👆 Click on a region to see average rental prices and property counts.")
